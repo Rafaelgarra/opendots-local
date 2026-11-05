@@ -16,6 +16,8 @@ Built with [CopilotKit](https://github.com/CopilotKit/CopilotKit) and [AG-UI](ht
 
 This local-history variant runs conversations through a durable SQLite/SSE runner on your own server, without CopilotKit Intelligence. See [Local setup and privacy](docs/LOCAL-HISTORY.md). The upstream Intelligence integration remains optional.
 
+For MVP v1 with OpenDots and subscription-authenticated Claude/Codex on the client PC, and Qwen plus conversation history on BC-250 over authenticated HTTPS, see [MVP v1 setup and limits](docs/MVP-V1.md). This mode adds no agent framework or history synchronization.
+
 [**Building on OpenDots? Meet with the CopilotKit team →**](https://www.copilotkit.ai/talk-to-an-engineer?ref=opendots_readme)
 
 </div>

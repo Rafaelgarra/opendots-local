@@ -55,6 +55,6 @@ export function modelFetch(
       if (target.origin !== base.origin)
         throw new Error('Local model requests must use the configured origin.');
     }
-    return transport(input, { ...init, redirect: 'error' });
+    return (config.bcFetch ?? transport)(input, { ...init, redirect: 'error' });
   };
 }

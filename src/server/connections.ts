@@ -1,3 +1,4 @@
+import { cliTransport, cliWorker, type CliConfig } from './cli-connection.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -149,23 +150,32 @@ export class ConnectionService {
     private transport: McpTransportFactory = httpTransport,
     private timeoutMs = 60_000,
     private localOnly = false,
+    private cli?: CliConfig,
   ) {}
   private async session<T>(
     target: { url: string; token?: string },
     signal: AbortSignal | undefined,
     use: (client: Client, signal: AbortSignal) => Promise<T>,
   ) {
-    if (this.localOnly)
+    const worker = cliWorker(target.url);
+    if ((worker && !this.cli?.commands[worker]) || (this.localOnly && !worker))
       throw new Error('MCP connections are disabled while LOCAL_ONLY=true.');
     const bounded = AbortSignal.any([
-      AbortSignal.timeout(this.timeoutMs),
+      AbortSignal.timeout(
+        worker && this.cli ? this.cli.timeoutMs + 10000 : this.timeoutMs,
+      ),
       ...(signal ? [signal] : []),
     ]);
     const client = new Client({ name: 'opendots', version: '0.1.0' });
     try {
-      await client.connect(this.transport({ ...target, signal: bounded }), {
-        signal: bounded,
-      });
+      await client.connect(
+        worker && this.cli
+          ? cliTransport(worker, this.cli, bounded)
+          : this.transport({ ...target, signal: bounded }),
+        {
+          signal: bounded,
+        },
+      );
       return await use(client, bounded);
     } finally {
       await client.close().catch(() => {});
@@ -260,7 +270,16 @@ export class ConnectionService {
     );
   }
   tools(dotId: string) {
-    return this.localOnly ? [] : exposedTools(this.store.list(dotId));
+    return exposedTools(
+      this.store.list(dotId).filter((connection) => {
+        const worker = cliWorker(connection.url);
+        return worker ? !!this.cli?.commands[worker] : !this.localOnly;
+      }),
+    ).map((item) =>
+      cliWorker(item.connection.url)
+        ? { ...item, tool: { ...item.tool, requiresApproval: true } }
+        : item,
+    );
   }
   resolve(dotId: string, name: string) {
     const match = this.tools(dotId).find((tool) => tool.name === name);
@@ -295,7 +314,13 @@ export class ConnectionService {
             await client.callTool(
               { name: exposed.tool.name, arguments: args },
               undefined,
-              { signal: bounded },
+              {
+                signal: bounded,
+                timeout:
+                  cliWorker(exposed.connection.url) && this.cli
+                    ? this.cli.timeoutMs + 10_000
+                    : this.timeoutMs,
+              },
             ),
           ),
       );

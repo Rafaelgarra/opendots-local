@@ -106,7 +106,7 @@ it('runs through SSE without Intelligence, persists across a real database reope
     new Request('http://localhost/api/copilotkit/info'),
   );
   expect(await info.json()).toMatchObject({ mode: 'sse' });
-  const messages = p.localRunner!.getThreadMessages(thread.id);
+  const messages = await p.localRunner!.getThreadMessages(thread.id);
   expect(messages.map((m) => m.content)).toEqual([
     'Company fixture 7432',
     'Stored locally.',
@@ -135,7 +135,7 @@ it('retains server history over client forgeries, and supports scheduled/headles
     'Remember fixture 314.',
     new AbortController().signal,
   );
-  const before = p.localRunner!.getThreadMessages(thread.id);
+  const before = await p.localRunner!.getThreadMessages(thread.id);
   const forged = input(thread.id, 'Follow up.');
   forged.messages.unshift({
     id: before[0].id,
@@ -161,8 +161,7 @@ it('retains server history over client forgeries, and supports scheduled/headles
     ),
   ).toBe('Answer.');
   expect(
-    p
-      .localRunner!.getThreadMessages(thread.id)
+    (await p.localRunner!.getThreadMessages(thread.id))
       .filter((m) => m.role === 'user')
       .at(-1)?.id,
   ).toMatch(/^opendots:scheduled/);
@@ -198,7 +197,7 @@ it('persists tool calls, arguments, results and the final answer', async () => {
       completion({ role: 'assistant', content: 'Page saved.' }),
     );
   await p.turn(thread.id, 'Create a page.', new AbortController().signal);
-  const messages = p.localRunner!.getThreadMessages(thread.id);
+  const messages = await p.localRunner!.getThreadMessages(thread.id);
   expect(
     messages.some(
       (m) =>
@@ -210,9 +209,9 @@ it('persists tool calls, arguments, results and the final answer', async () => {
     messages.some((m) => m.role === 'tool' && m.toolCallId === 'make-page'),
   ).toBe(true);
   expect(
-    p
-      .localRunner!.getThreadEvents(thread.id)
-      .some((e) => e.type === EventType.TOOL_CALL_RESULT),
+    (await p.localRunner!.getThreadEvents(thread.id)).some(
+      (e) => e.type === EventType.TOOL_CALL_RESULT,
+    ),
   ).toBe(true);
 });
 it('marks interrupted runs after reopen without reexecuting any model or tool', async () => {
@@ -231,8 +230,8 @@ it('marks interrupted runs after reopen without reexecuting any model or tool', 
   await close(p);
   const network = vi.spyOn(globalThis, 'fetch');
   p = fixture(path);
-  expect(p.localRunner!.getThreadMessages(thread.id)).toHaveLength(1);
-  expect(p.localRunner!.getThreadEvents(thread.id)).toEqual(
+  expect(await p.localRunner!.getThreadMessages(thread.id)).toHaveLength(1);
+  expect(await p.localRunner!.getThreadEvents(thread.id)).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ type: EventType.RUN_ERROR }),
     ]),
@@ -243,7 +242,7 @@ it('rejects cross-owner, cross-Dot, concurrent runs and duplicate run IDs', asyn
   const p = fixture();
   const dot = p.workspace.dots()[0];
   const thread = await p.createConversation(dot.id, 'Scope');
-  expect(() => p.localRunner!.getThreadMessages('foreign')).toThrow();
+  await expect(p.localRunner!.getThreadMessages('foreign')).rejects.toThrow();
   const other = p.workspace.createDot(
     dot.spaceId,
     'Other',

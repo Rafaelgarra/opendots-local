@@ -1,3 +1,4 @@
+import type { CliConfig } from './cli-connection.js';
 import type { WebConfig } from './parallel.js';
 import type { SetupStatus } from '../shared/types.js';
 
@@ -50,6 +51,8 @@ function firstNonEmptyEnvValue(
 }
 
 export interface PlatformConfig extends WebConfig {
+  cli?: CliConfig;
+  bcFetch?: typeof fetch;
   conversationStorage?: 'local' | 'intelligence';
   localOnly?: boolean;
   localModelHosts?: string[];

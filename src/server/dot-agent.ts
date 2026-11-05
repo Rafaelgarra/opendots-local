@@ -320,6 +320,7 @@ export class DotAgent extends AbstractAgent {
             undefined,
             undefined,
             this.config.localOnly,
+            this.config.cli,
           ),
           dot.id,
           input.threadId,

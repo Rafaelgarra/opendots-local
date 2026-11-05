@@ -4,6 +4,7 @@ import { EventType, type Message } from '@ag-ui/core';
 import { voiceReceiptMessagePrefix } from '../shared/voice-receipt.js';
 import { scheduledTaskMessagePrefix } from '../shared/scheduled-message.js';
 import { ComputerService } from './computer-service.js';
+import { installCliConnections } from './cli-connection.js';
 import { ConnectionService } from './connections.js';
 import { PageService } from './page-service.js';
 import { randomUUID } from 'node:crypto';
@@ -48,11 +49,18 @@ export class Platform {
       config,
       () => store.settings().paused,
     );
+    if (config.cli)
+      installCliConnections(
+        workspace.connections,
+        workspace.dots().map((d) => d.id),
+        config.cli,
+      );
     this.connections = new ConnectionService(
       workspace.connections,
       undefined,
       undefined,
       config.localOnly,
+      config.cli,
     );
     this.pages = new PageService(workspace, () => {
       this.requireReady();
@@ -69,7 +77,9 @@ export class Platform {
             if (input.userId !== workspace.ownerId)
               throw new Error('Conversation scope denied.');
             return {
-              messages: this.localRunner!.getThreadMessages(input.threadId),
+              messages: await this.localRunner!.getThreadMessages(
+                input.threadId,
+              ),
             };
           },
         };
@@ -228,7 +238,7 @@ export class Platform {
     this.requireReady();
     this.workspace.requireThread(threadId);
     const history = this.localRunner
-      ? { messages: this.localRunner.getThreadMessages(threadId) }
+      ? { messages: await this.localRunner.getThreadMessages(threadId) }
       : await this.intelligence!.getThreadMessages({
           threadId,
           userId: this.workspace.ownerId,

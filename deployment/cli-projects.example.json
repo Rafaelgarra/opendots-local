@@ -1,0 +1,18 @@
+{
+  "corporateAuthorized": false,
+  "timeoutMs": 540000,
+  "commands": {
+    "codex": [
+      "C:/Program Files/nodejs/node.exe",
+      "C:/PATH/TO/@openai/codex/bin/codex.js"
+    ],
+    "claude": ["C:/Users/YOUR_USER/.local/bin/claude.exe"]
+  },
+  "projects": {
+    "synthetic": {
+      "path": "C:/OpenDots-Synthetic-Test",
+      "classification": "synthetic",
+      "access": "workspace-write"
+    }
+  }
+}

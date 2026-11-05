@@ -1,3 +1,6 @@
+import { bcFetch } from './bc-fetch.js';
+import { RemoteHistory } from './remote-history.js';
+import { readCliConfig } from './cli-connection.js';
 import { serverTls } from './tls.js';
 import { webSearchProvider } from './parallel.js';
 import { createShutdown } from './shutdown.js';
@@ -29,15 +32,48 @@ if (
 const tls = serverTls(process.env, host, process.env.LOCAL_ONLY !== 'false');
 const protocol = tls ? 'https' : 'http';
 const database = process.env.DATABASE_PATH ?? 'data/opendots.sqlite';
+const bcUrl = process.env.BC250_URL;
+if (bcUrl && process.env.LOCAL_ONLY === 'false')
+  throw new Error(
+    'MVP BC-250 mode requires LOCAL_ONLY=true; native CLI connections are explicitly scoped exceptions.',
+  );
+const bcTransport = bcUrl
+  ? bcFetch(bcUrl, process.env.BC250_CA_FILE ?? '')
+  : undefined;
+const remoteHistory =
+  bcUrl && bcTransport
+    ? new RemoteHistory(bcUrl, process.env.BC250_TOKEN ?? '', bcTransport)
+    : undefined;
+if (remoteHistory && process.env.CONVERSATION_STORAGE === 'intelligence')
+  throw new Error(
+    'BC-250 history requires local conversation mode, without Intelligence.',
+  );
+const cli = process.env.CLI_CONFIG_FILE
+  ? readCliConfig(process.env.CLI_CONFIG_FILE)
+  : undefined;
+if (cli?.corporateAuthorized && process.env.BC250_COMPANY_AUTHORIZED !== 'true')
+  throw new Error(
+    'Corporate CLI projects require explicit company authorization for BC-250.',
+  );
+if (
+  process.env.BC250_DATA_CLASS === 'corporate' &&
+  process.env.BC250_COMPANY_AUTHORIZED !== 'true'
+)
+  throw new Error(
+    'Explicit company authorization is required for corporate data on BC-250.',
+  );
 const store = new Store(database);
 const workspace = new WorkspaceStore(
   database,
   process.env.OWNER_ID ?? 'opendots-owner',
+  remoteHistory,
 );
 const conversationStorage = process.env.CONVERSATION_STORAGE ?? 'local';
 if (!['local', 'intelligence'].includes(conversationStorage))
   throw new Error('CONVERSATION_STORAGE must be local or intelligence.');
 const config: PlatformConfig = {
+  cli,
+  bcFetch: bcTransport,
   conversationStorage: conversationStorage as 'local' | 'intelligence',
   localOnly: process.env.LOCAL_ONLY !== 'false',
   localModelHosts: (
@@ -50,9 +86,11 @@ const config: PlatformConfig = {
   intelligenceKey: intelligenceApiKeyFromEnv(process.env),
   intelligenceApiUrl: process.env.INTELLIGENCE_API_URL || undefined,
   intelligenceWsUrl: intelligenceWsUrlFromEnv(process.env),
-  apiKey: process.env.OPENAI_API_KEY,
-  model: process.env.OPENAI_MODEL,
-  baseUrl: process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1',
+  apiKey: bcUrl ? process.env.BC250_TOKEN : process.env.OPENAI_API_KEY,
+  model: bcUrl ? 'agente' : process.env.OPENAI_MODEL,
+  baseUrl:
+    (bcUrl ? `${bcUrl.replace(/\/$/, '')}/v1` : process.env.OPENAI_BASE_URL) ??
+    'https://api.openai.com/v1',
   agentRunTimeoutMs: agentRunTimeoutMsFromEnv(process.env),
   webSearchProvider: webSearchProvider(process.env.WEB_SEARCH_PROVIDER),
   parallelApiKey: process.env.PARALLEL_API_KEY,
@@ -77,6 +115,7 @@ const config: PlatformConfig = {
   ownerToken,
 };
 const platform = new Platform(store, workspace, config);
+await platform.localRunner?.ready;
 const researchConfig = {
   mode: 'live' as const,
   apiKey: platform.config.apiKey,

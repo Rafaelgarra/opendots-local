@@ -1,3 +1,4 @@
+import { cliWorker } from './cli-connection.js';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import {
@@ -141,6 +142,14 @@ export function connectionRoutes(
     if (claimed && claimed.toolCallId !== body.toolCallId)
       return c.json(
         { error: 'This approval request already ran its stored action.' },
+        409,
+      );
+    if (previous && cliWorker(exposed.connection.url))
+      return c.json(
+        {
+          error:
+            'CLI result is uncertain. Review effects and request a new owner approval; interrupted work is never automatically retried.',
+        },
         409,
       );
     if (previous) {
