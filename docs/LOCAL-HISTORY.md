@@ -2,6 +2,8 @@
 
 Esta variante usa o código aberto do OpenDots e um executor SSE próprio, com persistência SQLite. Não requer conta, chave, licença nem servidor CopilotKit Intelligence para conversar.
 
+Notebook cliente: consulte [CLIENTE-LAN.md](CLIENTE-LAN.md). O acesso pelo navegador dispensa instalar o servidor no notebook.
+
 ## Onde cada parte roda
 
 | Máquina                | Responsabilidade                                                     |
@@ -22,7 +24,7 @@ Histórico antigo armazenado no serviço Intelligence não é baixado nem migrad
 
 ## Instalar em um PC servidor Windows
 
-Requisitos: Node.js 24 ou superior, Git, PowerShell 7 e cliente OpenSSH. O notebook usa apenas um navegador na mesma rede.
+Requisitos: Node.js 24 ou superior, Git, PowerShell 7.5 ou superior e cliente OpenSSH. O notebook usa apenas um navegador na mesma rede.
 
 1. Clone o repositório do código, entre na pasta e execute `npm ci`.
 2. Copie `.env.example` para `.env`. Configure `BC250_SSH_HOST` com o usuário e nome/IP da sua BC-250. Configure uma chave SSH e confira a identidade do servidor antes do primeiro uso. Chaves SSH não pertencem a este repositório.

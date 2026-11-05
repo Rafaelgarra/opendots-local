@@ -1,5 +1,5 @@
-#Requires -Version 7.0
-param([string]$LanAddress, [int]$Port = 44310)
+#Requires -Version 7.5
+param([string]$LanAddress, [int]$Port = 44310, [switch]$RenewCertificate)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $privateDir = Join-Path $projectRoot '.opendots\lan'
@@ -16,6 +16,12 @@ $pcName = $env:COMPUTERNAME.ToLowerInvariant()
 $certFile = Join-Path $privateDir 'server.pem'
 $keyFile = Join-Path $privateDir 'server.key'
 $caFile = Join-Path $privateDir 'opendots-local-ca.cer'
+if ($RenewCertificate) {
+  $backupTag = [DateTimeOffset]::UtcNow.ToString('yyyyMMddHHmmss')
+  foreach ($certificatePath in @($certFile, $keyFile, $caFile)) {
+    if (Test-Path -LiteralPath $certificatePath) { Move-Item -LiteralPath $certificatePath -Destination ($certificatePath + '.previous-' + $backupTag) }
+  }
+}
 if (!(Test-Path -LiteralPath $certFile) -and !(Test-Path -LiteralPath $keyFile)) {
   $caKey = [Security.Cryptography.RSA]::Create(3072)
   $hash = [Security.Cryptography.HashAlgorithmName]::SHA256
@@ -23,6 +29,7 @@ if (!(Test-Path -LiteralPath $certFile) -and !(Test-Path -LiteralPath $keyFile))
   $caRequest = [Security.Cryptography.X509Certificates.CertificateRequest]::new('CN=OpenDots Local CA', $caKey, $hash, $padding)
   $caRequest.CertificateExtensions.Add([Security.Cryptography.X509Certificates.X509BasicConstraintsExtension]::new($true, $false, 0, $true))
   $caRequest.CertificateExtensions.Add([Security.Cryptography.X509Certificates.X509KeyUsageExtension]::new([Security.Cryptography.X509Certificates.X509KeyUsageFlags]::KeyCertSign, $true))
+  $caRequest.CertificateExtensions.Add([Security.Cryptography.X509Certificates.X509SubjectKeyIdentifierExtension]::new($caRequest.PublicKey, $false))
   $start = [DateTimeOffset]::UtcNow.AddMinutes(-5)
   $ca = $caRequest.CreateSelfSigned($start, $start.AddYears(2))
   $serverKey = [Security.Cryptography.RSA]::Create(3072)
@@ -32,6 +39,8 @@ if (!(Test-Path -LiteralPath $certFile) -and !(Test-Path -LiteralPath $keyFile))
   $san.AddIpAddress([Net.IPAddress]::Parse($LanAddress))
   $san.AddIpAddress([Net.IPAddress]::Parse('127.0.0.1'))
   $request.CertificateExtensions.Add($san.Build())
+  $request.CertificateExtensions.Add([Security.Cryptography.X509Certificates.X509SubjectKeyIdentifierExtension]::new($request.PublicKey, $false))
+  $request.CertificateExtensions.Add([Security.Cryptography.X509Certificates.X509AuthorityKeyIdentifierExtension]::CreateFromCertificate($ca, $true, $false))
   $request.CertificateExtensions.Add([Security.Cryptography.X509Certificates.X509BasicConstraintsExtension]::new($false, $false, 0, $true))
   $request.CertificateExtensions.Add([Security.Cryptography.X509Certificates.X509KeyUsageExtension]::new([Security.Cryptography.X509Certificates.X509KeyUsageFlags]::DigitalSignature -bor [Security.Cryptography.X509Certificates.X509KeyUsageFlags]::KeyEncipherment, $true))
   $oids = [Security.Cryptography.OidCollection]::new()
