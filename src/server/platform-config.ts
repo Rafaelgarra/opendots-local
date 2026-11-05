@@ -50,6 +50,9 @@ function firstNonEmptyEnvValue(
 }
 
 export interface PlatformConfig extends WebConfig {
+  conversationStorage?: 'local' | 'intelligence';
+  localOnly?: boolean;
+  localModelHosts?: string[];
   intelligenceKey?: string;
   intelligenceApiUrl?: string;
   intelligenceWsUrl?: string;
@@ -80,7 +83,9 @@ export function setupStatus(
   activationFailed = false,
 ): SetupStatus {
   const missing = [
-    !config.intelligenceKey && INTELLIGENCE_KEY_MISSING_LABEL,
+    config.conversationStorage !== 'local' &&
+      !config.intelligenceKey &&
+      INTELLIGENCE_KEY_MISSING_LABEL,
     !config.apiKey && 'OPENAI_API_KEY',
     !config.model && 'OPENAI_MODEL',
   ].filter((item): item is string => !!item);
@@ -97,7 +102,10 @@ export function setupStatus(
       ? 'setup_required'
       : 'not_configured';
   return {
-    intelligence: !!config.intelligenceKey,
+    conversationStorage: config.conversationStorage ?? 'intelligence',
+    localOnly: config.localOnly ?? false,
+    intelligence:
+      config.conversationStorage !== 'local' && !!config.intelligenceKey,
     model: !!(config.apiKey && config.model),
     browser: !!(config.browserUrl && config.browserSecret),
     voice: !!(config.voiceKey && config.voiceModel && !missing.length),

@@ -8,6 +8,7 @@ export function ThreadList({
   selected,
   onSelect,
   onNew,
+  localHistory = false,
 }: {
   dots: Dot[];
   dotId: string;
@@ -15,10 +16,11 @@ export function ThreadList({
   selected?: string;
   onSelect: (id: string) => void;
   onNew: () => void;
+  localHistory?: boolean;
 }) {
   const threads = useThreads({
     agentId: dotId,
-    enabled: true,
+    enabled: !localHistory,
     includeArchived: false,
     limit: 20,
   });

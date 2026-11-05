@@ -1,3 +1,4 @@
+import { serverTls } from './tls.js';
 import { webSearchProvider } from './parallel.js';
 import { createShutdown } from './shutdown.js';
 import { reportChannelFailure, safeFailure } from './slack-channel.js';
@@ -25,13 +26,27 @@ if (
   throw new Error(
     'External binding requires an OWNER_TOKEN of at least 24 characters.',
   );
+const tls = serverTls(process.env, host, process.env.LOCAL_ONLY !== 'false');
+const protocol = tls ? 'https' : 'http';
 const database = process.env.DATABASE_PATH ?? 'data/opendots.sqlite';
 const store = new Store(database);
 const workspace = new WorkspaceStore(
   database,
   process.env.OWNER_ID ?? 'opendots-owner',
 );
+const conversationStorage = process.env.CONVERSATION_STORAGE ?? 'local';
+if (!['local', 'intelligence'].includes(conversationStorage))
+  throw new Error('CONVERSATION_STORAGE must be local or intelligence.');
 const config: PlatformConfig = {
+  conversationStorage: conversationStorage as 'local' | 'intelligence',
+  localOnly: process.env.LOCAL_ONLY !== 'false',
+  localModelHosts: (
+    process.env.LOCAL_MODEL_HOSTS ??
+    'localhost,127.0.0.1,[::1],bc250-server.local'
+  )
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean),
   intelligenceKey: intelligenceApiKeyFromEnv(process.env),
   intelligenceApiUrl: process.env.INTELLIGENCE_API_URL || undefined,
   intelligenceWsUrl: intelligenceWsUrlFromEnv(process.env),
@@ -58,19 +73,19 @@ const config: PlatformConfig = {
     .map((value) => value.trim())
     .filter(Boolean),
   slackDotId: process.env.SLACK_DOT_ID || undefined,
-  runtimeUrl: `http://${host === '::1' ? '[::1]' : '127.0.0.1'}:${port}/api/copilotkit`,
+  runtimeUrl: `${protocol}://${host === '::1' ? '[::1]' : '127.0.0.1'}:${port}/api/copilotkit`,
   ownerToken,
 };
 const platform = new Platform(store, workspace, config);
 const researchConfig = {
   mode: 'live' as const,
-  apiKey: config.apiKey,
-  model: config.model,
+  apiKey: platform.config.apiKey,
+  model: platform.config.model,
   baseUrl: config.baseUrl,
-  webSearchProvider: config.webSearchProvider,
-  parallelApiKey: config.parallelApiKey,
-  browserUrl: config.browserUrl,
-  browserSecret: config.browserSecret,
+  webSearchProvider: platform.config.webSearchProvider,
+  parallelApiKey: platform.config.parallelApiKey,
+  browserUrl: platform.config.browserUrl,
+  browserSecret: platform.config.browserSecret,
 };
 const runner = new Runner(
   store,
@@ -79,9 +94,9 @@ const runner = new Runner(
     const threadId = workspace.taskThread(claim.id);
     if (!threadId)
       throw new Error(
-        'This legacy task has no Intelligence conversation. Create a new scheduled task from a conversation.',
+        'This legacy task has no bound conversation. Create a new scheduled task from a conversation.',
       );
-    progress('Running this task in its Intelligence conversation.');
+    progress('Running this task in its saved conversation.');
     const text = await platform.turn(threadId, claim.prompt, signal, {
       opendotsSource: 'scheduled_task',
     });
@@ -89,9 +104,13 @@ const runner = new Runner(
   },
   config.agentRunTimeoutMs,
 );
-const wsOrigin = new URL(
-  config.intelligenceWsUrl ?? 'wss://realtime.intelligence.copilotkit.ai',
-).origin;
+const wsOrigin =
+  conversationStorage === 'local'
+    ? ''
+    : new URL(
+        platform.config.intelligenceWsUrl ??
+          'wss://realtime.intelligence.copilotkit.ai',
+      ).origin;
 const app = createApp({
   store,
   runner,
@@ -112,18 +131,23 @@ app.use('*', async (c, next) => {
 app.get('/api/*', (c) => c.json({ error: 'Not found.' }, 404));
 app.use('/*', serveStatic({ root: './dist/client' }));
 app.get('*', serveStatic({ path: './dist/client/index.html' }));
-const server = serve({ fetch: app.fetch, hostname: host, port }, (info) => {
-  console.log(`OpenDots template listening on http://${host}:${info.port}`);
-  runner.start();
-  void platform
-    .start()
-    .catch((error) =>
-      reportChannelFailure(
-        'Slack Channels activation failed; check setup status',
-        [safeFailure(error)],
-      ),
+const server = serve(
+  { fetch: app.fetch, hostname: host, port, ...tls },
+  (info) => {
+    console.log(
+      `OpenDots template listening on ${protocol}://${host}:${info.port}`,
     );
-});
+    runner.start();
+    void platform
+      .start()
+      .catch((error) =>
+        reportChannelFailure(
+          'Slack Channels activation failed; check setup status',
+          [safeFailure(error)],
+        ),
+      );
+  },
+);
 const shutdown = createShutdown({
   stopRunner: () => runner.stop(),
   stopPlatform: () => platform.stop(),

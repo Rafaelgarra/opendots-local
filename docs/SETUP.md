@@ -1,5 +1,7 @@
 # Running the template
 
+This local-history variant defaults to SQLite storage and local-only operation. Start with [LOCAL-HISTORY.md](LOCAL-HISTORY.md). The Intelligence instructions below apply only when explicitly selecting `CONVERSATION_STORAGE=intelligence` and `LOCAL_ONLY=false`.
+
 OpenDots runs a React app and a Node server. The server stores pages, Space and Dot configuration, and thread bindings in SQLite and connects to your configured conversation, model, and messaging services.
 
 ## Local development
@@ -27,7 +29,7 @@ Open http://127.0.0.1:4310. Keep the server running for background work.
 
 ## Conversation services
 
-OpenDots requires CopilotKit Intelligence for conversations. Choose local evaluation below, a licensed [self-hosted deployment](https://docs.copilotkit.ai/intelligence/self-hosting), or hosted Intelligence. Pages and workspace metadata remain in SQLite; conversation history is stored separately. See [Data and privacy](../README.md#data-and-privacy).
+The upstream optional conversation mode uses CopilotKit Intelligence. Choose local evaluation below, a licensed [self-hosted deployment](https://docs.copilotkit.ai/intelligence/self-hosting), or hosted Intelligence. Pages and workspace metadata remain in SQLite; conversation history is stored separately. See [Data and privacy](../README.md#data-and-privacy).
 
 ### Hosted Intelligence
 

@@ -148,12 +148,15 @@ export class ConnectionService {
     readonly store: ConnectionStore,
     private transport: McpTransportFactory = httpTransport,
     private timeoutMs = 60_000,
+    private localOnly = false,
   ) {}
   private async session<T>(
     target: { url: string; token?: string },
     signal: AbortSignal | undefined,
     use: (client: Client, signal: AbortSignal) => Promise<T>,
   ) {
+    if (this.localOnly)
+      throw new Error('MCP connections are disabled while LOCAL_ONLY=true.');
     const bounded = AbortSignal.any([
       AbortSignal.timeout(this.timeoutMs),
       ...(signal ? [signal] : []),
@@ -257,7 +260,7 @@ export class ConnectionService {
     );
   }
   tools(dotId: string) {
-    return exposedTools(this.store.list(dotId));
+    return this.localOnly ? [] : exposedTools(this.store.list(dotId));
   }
   resolve(dotId: string, name: string) {
     const match = this.tools(dotId).find((tool) => tool.name === name);

@@ -1,7 +1,10 @@
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
+
+// Each test launches a fresh Node process; match its bounded 15s timeout.
+vi.setConfig({ testTimeout: 20000 });
 
 const run = promisify(execFile);
 const platformUrl = new URL('../src/server/platform.ts', import.meta.url).href;
@@ -126,9 +129,9 @@ it('forwards the CLI identity and both opt-outs into the Docker app', async () =
     'utf8',
   );
   expect(compose).toContain('CPK_TELEMETRY_ID: ${CPK_TELEMETRY_ID:-}');
-  expect(compose).toContain('DO_NOT_TRACK: ${DO_NOT_TRACK:-0}');
+  expect(compose).toContain('DO_NOT_TRACK: ${DO_NOT_TRACK:-1}');
   expect(compose).toContain(
-    'COPILOTKIT_TELEMETRY_DISABLED: ${COPILOTKIT_TELEMETRY_DISABLED:-false}',
+    'COPILOTKIT_TELEMETRY_DISABLED: ${COPILOTKIT_TELEMETRY_DISABLED:-true}',
   );
 });
 

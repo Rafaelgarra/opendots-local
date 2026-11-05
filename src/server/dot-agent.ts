@@ -1,3 +1,4 @@
+import { modelFetch } from './privacy.js';
 import { parallelSources } from './parallel.js';
 import { pageReviewTool } from '../shared/page-review.js';
 import { ComputerService } from './computer-service.js';
@@ -118,7 +119,8 @@ export class DotAgent extends AbstractAgent {
           dot.id,
         );
         if (
-          !this.config.intelligenceKey ||
+          (this.config.conversationStorage !== 'local' &&
+            !this.config.intelligenceKey) ||
           !this.config.apiKey ||
           !this.config.model
         ) {
@@ -128,7 +130,9 @@ export class DotAgent extends AbstractAgent {
             step: 'setup_required',
             error_class: 'configuration_missing',
           });
-          throw new Error('Intelligence and model configuration are required.');
+          throw new Error(
+            'Conversation storage and model configuration are required.',
+          );
         }
         const initialSettings = this.store.settings();
         const initialConnections = this.workspace.connections.fingerprint(
@@ -311,7 +315,12 @@ export class DotAgent extends AbstractAgent {
           (tool) => tool.name === connectionActionTool.name,
         );
         const connected = connectionTools(
-          new ConnectionService(this.workspace.connections),
+          new ConnectionService(
+            this.workspace.connections,
+            undefined,
+            undefined,
+            this.config.localOnly,
+          ),
           dot.id,
           input.threadId,
           check,
@@ -333,6 +342,7 @@ export class DotAgent extends AbstractAgent {
           apiKey: this.config.apiKey,
           baseURL: this.config.baseUrl ?? 'https://api.openai.com/v1',
           api: 'chat-completions',
+          ...(this.config.localOnly ? { fetch: modelFetch(this.config) } : {}),
           maxRetries: 1,
         });
         const start = async () => {
@@ -365,7 +375,9 @@ export class DotAgent extends AbstractAgent {
           this.inner = new BuiltInAgent({
             type: 'tanstack',
             learnedSkills:
-              dot.skillDeliveryEnabled && conversation.learningContainerId
+              this.config.conversationStorage !== 'local' &&
+              dot.skillDeliveryEnabled &&
+              conversation.learningContainerId
                 ? {
                     containers: [{ id: conversation.learningContainerId }],
                     apiKey: this.config.intelligenceKey,

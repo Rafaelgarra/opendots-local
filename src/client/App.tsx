@@ -454,6 +454,7 @@ export function App() {
             dotId={dot.id}
             dots={workspace.dots}
             local={workspace.conversations}
+            localHistory={workspace.setup.conversationStorage === 'local'}
             selected={view === 'chat' ? selectedThread : undefined}
             onSelect={(id) => {
               const conversation = workspace.conversations.find(
@@ -546,7 +547,11 @@ export function App() {
           </div>
           <div className="top-actions">
             <span className="mode-badge">
-              {configured ? 'SELF-HOSTED' : 'SETUP REQUIRED'}
+              {configured
+                ? workspace.setup.localOnly
+                  ? 'LOCAL · PRIVATE'
+                  : 'SELF-HOSTED'
+                : 'SETUP REQUIRED'}
             </span>
             <button
               className="pause-button"
